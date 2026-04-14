@@ -1,0 +1,59 @@
+import cv2
+import mediapipe as mp
+import pyautogui
+import numpy as np
+
+# Screen size
+screen_width, screen_height = pyautogui.size()
+
+# Initialize camera
+cap = cv2.VideoCapture(0)
+
+# Initialize MediaPipe
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands()
+mp_draw = mp.solutions.drawing_utils
+
+while True:
+    success, img = cap.read()
+    img = cv2.flip(img, 1)
+    h, w, _ = img.shape
+
+    rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    result = hands.process(rgb_img)
+
+    if result.multi_hand_landmarks:
+        for hand_landmarks in result.multi_hand_landmarks:
+            mp_draw.draw_landmarks(img, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+
+            # Get index finger tip (id = 8)
+            index_finger = hand_landmarks.landmark[8]
+            x = int(index_finger.x * w)
+            y = int(index_finger.y * h)
+
+            # Convert to screen coordinates
+            screen_x = np.interp(x, (0, w), (0, screen_width))
+            screen_y = np.interp(y, (0, h), (0, screen_height))
+
+            pyautogui.moveTo(screen_x, screen_y)
+
+            # Get thumb tip (id = 4)
+            thumb = hand_landmarks.landmark[4]
+            thumb_x = int(thumb.x * w)
+            thumb_y = int(thumb.y * h)
+
+            # Distance between index and thumb
+            distance = np.hypot(thumb_x - x, thumb_y - y)
+
+            # Click when fingers are close
+            if distance < 40:
+                pyautogui.click()
+                pyautogui.sleep(0.3)
+
+    cv2.imshow("Virtual Mouse", img)
+
+    if cv2.waitKey(1) & 0xFF == 27:
+        break
+
+cap.release()
+cv2.destroyAllWindows()
